@@ -4,7 +4,7 @@ import Footer from '@/components/Pied de page';
 import { Button } from '@/components/interface utilisateur/button';
 import { Input } from '@/components/interface utilisateur/input';
 
-const API_BASE = 'http://localhost:3001';
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001';
 
 export default function AdminTransactions() {
   const [rows, setRows] = React.useState<any[]>([]);

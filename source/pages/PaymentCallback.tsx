@@ -6,6 +6,7 @@ export default function PaymentCallback() {
   const [status, setStatus] = React.useState<string>('processing');
   const [message, setMessage] = React.useState<string>('Vérification en cours...');
   const [details, setDetails] = React.useState<any>(null);
+  const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001';
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -14,7 +15,7 @@ export default function PaymentCallback() {
     setStatus(txStatus);
 
     if (id) {
-      fetch(`http://localhost:3001/api/pay/flutterwave/verify?transaction_id=${encodeURIComponent(id)}`)
+      fetch(`${API_BASE}/api/pay/flutterwave/verify?transaction_id=${encodeURIComponent(id)}`)
         .then(async (r) => ({ ok: r.ok, data: await r.json() }))
         .then(({ ok, data }) => {
           if (!ok || !data?.ok) {

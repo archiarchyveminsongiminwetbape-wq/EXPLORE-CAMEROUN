@@ -11,11 +11,12 @@ export default function PayCard() {
   const [amount, setAmount] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [processing, setProcessing] = React.useState(false);
+  const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001';
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setProcessing(true);
     try {
-      const res = await fetch('http://localhost:3001/api/pay/flutterwave/init', {
+      const res = await fetch(`${API_BASE}/api/pay/flutterwave/init`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: Number(amount), email, currency: 'XAF' }),

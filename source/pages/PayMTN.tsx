@@ -10,11 +10,12 @@ export default function PayMTN() {
   const [phone, setPhone] = React.useState('');
   const [amount, setAmount] = React.useState<string>(() => String(totalXaf || ''));
   const [processing, setProcessing] = React.useState(false);
+  const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001';
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setProcessing(true);
     try {
-      const res = await fetch('http://localhost:3001/api/pay/flutterwave/init', {
+      const res = await fetch(`${API_BASE}/api/pay/flutterwave/init`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, amount: Number(amount), currency: 'XAF' }),
