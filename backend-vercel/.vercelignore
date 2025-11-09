@@ -1,0 +1,7 @@
+# Ignore all api routes except the catch-all
+api/*
+!api/[[...slug]].js
+
+# Ignore local dev artifacts
+node_modules
+.vercel
