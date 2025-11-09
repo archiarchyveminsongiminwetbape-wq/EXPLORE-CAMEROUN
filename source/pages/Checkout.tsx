@@ -18,7 +18,7 @@ type PaymentMethod = 'mtn' | 'orange' | 'card';
 
 export default function Checkout() {
   const { items, totalFormatted, clear } = useCart();
-  const { currency } = useCurrency();
+  const { currency, setCurrency } = useCurrency();
   const [method, setMethod] = React.useState<PaymentMethod>('mtn');
   const [email, setEmail] = React.useState('');
   const [processing, setProcessing] = React.useState(false);
@@ -89,25 +89,20 @@ export default function Checkout() {
   // Ajout de la gestion devise dynamique
   React.useEffect(() => {
     if (zone === 'CM') {
-      useCurrency().setCurrency('XAF');
+      setCurrency('XAF');
     } else if (['FR', 'BE', 'ES', 'DE', 'IT', 'PT', 'NL'].includes(zone)) {
-      useCurrency().setCurrency('EUR');
+      setCurrency('EUR');
     } else if (['US', 'CA'].includes(zone)) {
-      useCurrency().setCurrency('USD');
+      setCurrency('USD');
     } else {
-      useCurrency().setCurrency('XAF');
+      setCurrency('XAF');
     }
-  }, [zone]);
+  }, [zone, setCurrency]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setProcessing(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    // Envoi d'email de confirmation (mock)
-    console.log(t.emailSendLog(email));
-    alert(t.paymentSuccess(email));
-    clear();
-    setProcessing(false);
+    const target = method === 'mtn' ? '/pay/mtn' : method === 'orange' ? '/pay/orange' : '/pay/card';
+    navigate(target);
   };
 
   return (
@@ -170,11 +165,6 @@ export default function Checkout() {
                     <span className="text-xs mt-2 text-center">{t.card}</span>
                   </button>
                 </div>
-              </div>
-              <div className="pt-2">
-                <Button type="button" onClick={() => navigate(method === 'mtn' ? '/pay/mtn' : method === 'orange' ? '/pay/orange' : '/pay/card')} className="bg-gray-900 hover:bg-black">
-                  {lang==='fr' ? 'Continuer' : 'Continue'}
-                </Button>
               </div>
               <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={processing}>
                 {processing ? t.processing : t.pay}
