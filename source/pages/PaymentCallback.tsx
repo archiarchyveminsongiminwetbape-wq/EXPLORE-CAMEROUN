@@ -11,11 +11,11 @@ export default function PaymentCallback() {
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const txStatus = params.get('status') || params.get('resp') || 'processing';
-    const id = params.get('transaction_id') || params.get('id');
+    const id = params.get('order_id') || params.get('transaction_id') || params.get('id');
     setStatus(txStatus);
 
     if (id) {
-      fetch(`${API_BASE}/api/pay/flutterwave/verify?transaction_id=${encodeURIComponent(id)}`)
+      fetch(`${API_BASE}/api/pay/lygos/verify?order_id=${encodeURIComponent(id)}`)
         .then(async (r) => ({ ok: r.ok, data: await r.json() }))
         .then(({ ok, data }) => {
           if (!ok || !data?.ok) {
@@ -23,10 +23,10 @@ export default function PaymentCallback() {
             setDetails(data);
             return;
           }
-          const flwData = data.data?.data || data.data;
-          setDetails(flwData);
+          const payData = data.data?.data || data.data;
+          setDetails(payData);
           setMessage('Paiement vérifié');
-          setStatus(flwData?.status || 'successful');
+          setStatus((payData?.status || payData?.payment_status || 'successful'));
         })
         .catch(() => {
           setMessage('Erreur lors de la vérification');
