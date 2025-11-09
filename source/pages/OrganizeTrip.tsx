@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import Footer from '@/components/Pied de page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/interface utilisateur/card';
@@ -13,13 +13,16 @@ import { Badge } from '@/components/interface utilisateur/badge';
 import { Calendar, Users, MapPin, Bed, Utensils, Car, Plane, Shield, CreditCard, Trash2, Plus } from 'lucide-react';
 import { destinations, accommodations, restaurants, transports } from '@/data/destinations';
 import { useCurrency } from '@/crochets/utiliser-devise';
+import { useCart } from '@/crochets/utiliser-panier';
+
 import { formatAmount } from '@/lib/currency';
 import { Destination, CartItem, BookingDetails } from '@/types';
 
 export default function OrganizeTrip() {
   const location = useLocation();
+  const navigate = useNavigate();
   const selectedDestination = location.state?.selectedDestination as Destination;
-  
+
   const [bookingDetails, setBookingDetails] = useState<BookingDetails>({
     destination: selectedDestination?.id || '',
     startDate: '',
@@ -28,15 +31,14 @@ export default function OrganizeTrip() {
     needsFlight: false,
     needsInsurance: false
   });
-  
+
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedAccommodation, setSelectedAccommodation] = useState('');
   const [selectedRestaurant, setSelectedRestaurant] = useState('');
   const [selectedTransport, setSelectedTransport] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('');
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
-  const [customerEmail, setCustomerEmail] = useState('');
+  // Le paiement et l'email seront gérés sur la page Checkout
   const { currency } = useCurrency();
+  const { addItem, clear } = useCart();
 
   useEffect(() => {
     if (selectedDestination) {
@@ -193,76 +195,16 @@ export default function OrganizeTrip() {
       alert('Veuillez ajouter au moins un service à votre panier');
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
-      alert('Veuillez saisir un e-mail valide.');
-      return;
-    }
-    setShowPaymentForm(true);
+    try {
+      clear();
+      cart.forEach(ci => {
+        addItem({ id: ci.id, title: ci.name, priceXaf: ci.price }, ci.quantity);
+      });
+    } catch {}
+    navigate('/checkout');
   };
 
-  const handlePayment = () => {
-    if (!paymentMethod) {
-      alert('Veuillez sélectionner un moyen de paiement');
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
-      alert('Veuillez saisir un e-mail valide.');
-      return;
-    }
-    const total = calculateTotal();
-    const totalFormatted = formatAmount(total, currency);
-    alert(`Paiement de ${totalFormatted} confirmé via ${paymentMethod}. Merci pour votre réservation !`);
-
-    // Préparer l'email de confirmation pour l'admin
-    try {
-      const owners = ['minsongipaul@icloud.com','pminsongui@gmail.com'];
-      const subject = encodeURIComponent('Nouvelle réservation - Confirmation de paiement');
-      const nights = bookingDetails.startDate && bookingDetails.endDate 
-        ? Math.ceil((new Date(bookingDetails.endDate).getTime() - new Date(bookingDetails.startDate).getTime()) / (1000 * 60 * 60 * 24))
-        : 1;
-      const lines = [
-        `Client: ${customerEmail}`,
-        `Destination: ${currentDestination?.name || bookingDetails.destination}`,
-        `Dates: ${bookingDetails.startDate || '-'} au ${bookingDetails.endDate || '-'}`,
-        `Nuits: ${nights}`,
-        `Personnes: ${bookingDetails.numberOfPeople}`,
-        `Panier:`,
-        ...cart.map(i => ` - ${i.name} x${i.quantity} = ${formatAmount(i.price*i.quantity, currency)}`),
-        `Total: ${totalFormatted}`,
-        `Paiement: ${paymentMethod}`,
-      ].join('\n');
-      const body = encodeURIComponent(lines);
-      const mailto = `mailto:${owners.join(',')}?subject=${subject}&body=${body}`;
-      window.open(mailto, '_blank');
-    } catch {}
-
-    // Envoyer aussi un email de confirmation au client
-    try {
-      const subjectClient = encodeURIComponent('Confirmation de votre réservation');
-      const linesClient = [
-        `Bonjour,`,
-        '',
-        `Nous confirmons la réception de votre paiement pour votre réservation.`,
-        `Détails de votre commande :`,
-        `Destination: ${currentDestination?.name || bookingDetails.destination}`,
-        `Dates: ${bookingDetails.startDate || '-'} au ${bookingDetails.endDate || '-'}`,
-        `Personnes: ${bookingDetails.numberOfPeople}`,
-        `Total réglé: ${total.toLocaleString()} FCFA`,
-        `Mode de paiement: ${paymentMethod}`,
-        '',
-        `Merci de votre confiance et bon voyage !`,
-        `Explore Afrique`
-      ].join('\n');
-      const bodyClient = encodeURIComponent(linesClient);
-      const mailtoClient = `mailto:${customerEmail}?subject=${subjectClient}&body=${bodyClient}`;
-      window.open(mailtoClient, '_blank');
-    } catch {}
-
-    // Reset form
-    setCart([]);
-    setShowPaymentForm(false);
-    setPaymentMethod('');
-  };
+  // plus de paiement ici: géré dans Checkout
 
   useEffect(() => {
     handleAddFlight();
@@ -388,16 +330,6 @@ export default function OrganizeTrip() {
                     max="20"
                     value={bookingDetails.numberOfPeople}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBookingDetails(prev => ({ ...prev, numberOfPeople: parseInt(e.target.value) || 1 }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email de contact (obligatoire)</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="vous@exemple.com"
-                    value={customerEmail}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomerEmail(e.target.value)}
                   />
                 </div>
               </CardContent>
@@ -595,48 +527,13 @@ export default function OrganizeTrip() {
                       )}
                     </div>
                     
-                    {!showPaymentForm ? (
-                      <Button 
-                        className="w-full bg-green-600 hover:bg-green-700" 
-                        size="lg"
-                        onClick={handleProceedToPayment}
-                      >
-                        Procéder au paiement
-                      </Button>
-                    ) : (
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="payment">Moyen de paiement</Label>
-                          <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Choisir un moyen de paiement" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="mobile-money">Mobile Money</SelectItem>
-                              <SelectItem value="orange-money">Orange Money</SelectItem>
-                              <SelectItem value="carte-bancaire">Carte Bancaire</SelectItem>
-                              <SelectItem value="virement">Virement Bancaire</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            className="flex-1"
-                            onClick={() => setShowPaymentForm(false)}
-                          >
-                            Retour
-                          </Button>
-                          <Button 
-                            className="flex-1 bg-green-600 hover:bg-green-700"
-                            onClick={handlePayment}
-                          >
-                            Payer
-                          </Button>
-                        </div>
-                      </div>
-                    )}
+                    <Button 
+                      className="w-full bg-green-600 hover:bg-green-700" 
+                      size="lg"
+                      onClick={handleProceedToPayment}
+                    >
+                      Procéder au paiement
+                    </Button>
                     
                     <div className="text-center">
                       <a 
