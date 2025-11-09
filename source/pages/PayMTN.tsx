@@ -46,17 +46,18 @@ export default function PayMTN() {
       <main className="container mx-auto px-4 py-8 flex-1">
         <h1 className="text-2xl font-semibold mb-4">Paiement MTN Mobile Money</h1>
         <div className="mb-6">
-          <img src="/assets/MTN.jpeg" alt="MTN Mobile Money" className="h-12 w-auto object-contain" />
+          <img src="/assets/MTN.jpeg" alt="MTN Mobile Money" className="h-16 w-auto object-contain" />
         </div>
         <form onSubmit={onSubmit} className="space-y-4 max-w-md">
           <div>
             <label className="block text-sm mb-1">Numéro MTN</label>
             <Input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="67x xxx xxx" />
-            <p className="text-xs text-gray-500 mt-1">Saisissez votre numéro MTN Mobile Money exact.</p>
+            <p className="text-xs text-gray-600 mt-1">Saisissez votre numéro MTN Mobile Money exact.</p>
           </div>
           <div>
             <label className="block text-sm mb-1">Montant (XAF)</label>
             <Input type="number" required value={amount} readOnly />
+            <p className="text-xs text-gray-600 mt-1">Vérifiez le montant total de votre panier avant de valider.</p>
           </div>
           <Button type="submit" className="bg-yellow-500 hover:bg-yellow-600" disabled={processing}>
             {processing ? 'Traitement...' : 'Payer'}

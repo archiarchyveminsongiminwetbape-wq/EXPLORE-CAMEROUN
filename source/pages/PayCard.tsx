@@ -44,7 +44,7 @@ export default function PayCard() {
       <main className="container mx-auto px-4 py-8 flex-1">
         <h1 className="text-2xl font-semibold mb-4">Paiement par Carte</h1>
         <div className="mb-6">
-          <img src="/assets/carte.jpeg" alt="Carte bancaire" className="h-12 w-auto object-contain" />
+          <img src="/assets/carte.jpeg" alt="Carte bancaire" className="h-16 w-auto object-contain" />
         </div>
         <form onSubmit={onSubmit} className="space-y-4 max-w-md">
           <div>
@@ -61,15 +61,18 @@ export default function PayCard() {
             <div>
               <label className="block text-sm mb-1">Expiration</label>
               <Input required value={expiry} onChange={(e) => setExpiry(e.target.value)} placeholder="MM/AA" />
+              <p className="text-xs text-gray-600 mt-1">Format d’expiration: mois/année (ex. 08/27).</p>
             </div>
             <div>
               <label className="block text-sm mb-1">CVC</label>
               <Input required value={cvc} onChange={(e) => setCvc(e.target.value)} placeholder="123" />
+              <p className="text-xs text-gray-600 mt-1">Code à 3 chiffres au dos de la carte.</p>
             </div>
           </div>
           <div>
             <label className="block text-sm mb-1">Montant</label>
             <Input type="number" required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="10000" />
+            <p className="text-xs text-gray-600 mt-1">Saisissez le montant en XAF que vous souhaitez payer.</p>
           </div>
           <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={processing}>
             {processing ? 'Traitement...' : 'Payer'}
