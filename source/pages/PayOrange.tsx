@@ -4,9 +4,11 @@ import Footer from '@/components/Pied de page';
 import { Button } from '@/components/interface utilisateur/button';
 import { Input } from '@/components/interface utilisateur/input';
 import { useCart } from '@/crochets/utiliser-panier';
+import { useI18n } from '@/crochets/utiliser-i18n';
 
 export default function PayOrange() {
   const { totalXaf } = useCart();
+  const { t } = useI18n();
   const [phone, setPhone] = React.useState('');
   const [amount, setAmount] = React.useState<string>(() => String(totalXaf || ''));
   const [processing, setProcessing] = React.useState(false);
@@ -44,42 +46,42 @@ export default function PayOrange() {
     <div className="min-h-screen flex flex-col">
       <Header />
       <main className="container mx-auto px-4 py-8 flex-1">
-        <h1 className="text-2xl font-semibold mb-4">Paiement Orange Money</h1>
+        <h1 className="text-2xl font-semibold mb-4">{t('pay_orange_title')}</h1>
         <div className="mb-6">
           <img src="/assets/orange.jpeg" alt="Orange Money" className="h-16 w-auto object-contain" />
         </div>
         <form onSubmit={onSubmit} className="space-y-4 max-w-md">
           <div>
-            <label className="block text-sm mb-1">Numéro Orange</label>
+            <label className="block text-sm mb-1">{t('label_phone_orange')}</label>
             <Input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="69x xxx xxx" />
-            <p className="text-xs text-gray-600 mt-1">Saisissez votre numéro Orange Money exact.</p>
+            <p className="text-xs text-gray-600 mt-1">{t('help_phone_orange')}</p>
             {!phoneValid && phone.length > 0 && (
-              <p className="text-xs text-red-600 mt-1">Le numéro doit contenir 9 chiffres.</p>
+              <p className="text-xs text-red-600 mt-1">{t('error_phone_invalid')}</p>
             )}
           </div>
           <div>
-            <label className="block text-sm mb-1">Montant (XAF)</label>
+            <label className="block text-sm mb-1">{t('label_amount_xaf')}</label>
             <Input type="number" required value={amount} readOnly />
-            <p className="text-xs text-gray-600 mt-1">Vérifiez le montant total de votre panier avant de valider.</p>
+            <p className="text-xs text-gray-600 mt-1">{t('help_amount_cart')}</p>
           </div>
           <Button type="submit" className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50" disabled={!canSubmit}>
-            {processing ? 'Traitement...' : 'Payer'}
+            {processing ? t('common_processing') : t('common_pay')}
           </Button>
         </form>
 
         {confirmOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white w-full max-w-md rounded shadow-lg p-4">
-              <div className="text-lg font-semibold mb-2">Confirmer le paiement</div>
+              <div className="text-lg font-semibold mb-2">{t('confirm_title')}</div>
               <div className="text-sm text-gray-700 mb-4">
-                <div><span className="text-gray-500">Opérateur&nbsp;:</span> Orange Money</div>
-                <div><span className="text-gray-500">Téléphone&nbsp;:</span> {phone}</div>
-                <div><span className="text-gray-500">Montant&nbsp;:</span> {amount} XAF</div>
-                <div className="mt-2 text-xs text-gray-700">En cliquant sur « Confirmer », vous serez redirigé vers la page sécurisée de l’opérateur pour valider le paiement avec votre <strong>code secret</strong>.</div>
+                <div><span className="text-gray-500">{t('operator_label')}&nbsp;</span> Orange Money</div>
+                <div><span className="text-gray-500">{t('phone_label')}&nbsp;</span> {phone}</div>
+                <div><span className="text-gray-500">{t('amount_label')}&nbsp;</span> {amount} XAF</div>
+                <div className="mt-2 text-xs text-gray-700">{t('confirm_explainer_orange')}</div>
               </div>
               <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setConfirmOpen(false)}>Annuler</Button>
-                <Button onClick={confirmPayment} disabled={processing}>{processing ? 'Redirection...' : 'Confirmer'}</Button>
+                <Button variant="outline" onClick={() => setConfirmOpen(false)}>{t('btn_cancel')}</Button>
+                <Button onClick={confirmPayment} disabled={processing}>{processing ? t('common_processing') : t('btn_confirm')}</Button>
               </div>
             </div>
           </div>

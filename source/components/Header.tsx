@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/interface utilisateur/button';
 import { useCurrency } from '@/crochets/utiliser-devise';
 import type { SupportedCurrency } from '@/lib/currency';
+import { useI18n } from '@/crochets/utiliser-i18n';
 
 interface HeaderProps {
   cartItemsCount?: number;
@@ -10,6 +11,7 @@ interface HeaderProps {
 
 export default function Header({ cartItemsCount = 0 }: HeaderProps) {
   const { currency, setCurrency } = useCurrency();
+  const { locale, setLocale } = useI18n();
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -39,6 +41,15 @@ export default function Header({ cartItemsCount = 0 }: HeaderProps) {
           </nav>
 
           <div className="flex items-center space-x-4">
+            <select
+              aria-label="Language"
+              value={locale}
+              onChange={(e) => setLocale(e.target.value as any)}
+              className="border rounded-md px-2 py-1 text-sm"
+            >
+              <option value="fr">FR</option>
+              <option value="en">EN</option>
+            </select>
             <select
               aria-label="Devise"
               value={currency}

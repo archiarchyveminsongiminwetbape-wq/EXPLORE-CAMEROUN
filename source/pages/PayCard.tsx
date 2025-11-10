@@ -3,8 +3,10 @@ import Header from '@/components/Header';
 import Footer from '@/components/Pied de page';
 import { Button } from '@/components/interface utilisateur/button';
 import { Input } from '@/components/interface utilisateur/input';
+import { useI18n } from '@/crochets/utiliser-i18n';
 
 export default function PayCard() {
+  const { t } = useI18n();
   const [number, setNumber] = React.useState('');
   const [expiry, setExpiry] = React.useState('');
   const [cvc, setCvc] = React.useState('');
@@ -48,71 +50,71 @@ export default function PayCard() {
     <div className="min-h-screen flex flex-col">
       <Header />
       <main className="container mx-auto px-4 py-8 flex-1">
-        <h1 className="text-2xl font-semibold mb-4">Paiement par Carte</h1>
+        <h1 className="text-2xl font-semibold mb-4">{t('pay_card_title')}</h1>
         <div className="mb-6">
           <img src="/assets/carte.jpeg" alt="Carte bancaire" className="h-16 w-auto object-contain" />
         </div>
         <form onSubmit={onSubmit} className="space-y-4 max-w-md">
           <div>
-            <label className="block text-sm mb-1">Email</label>
-            <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vous@exemple.com" />
-            <p className="text-xs text-gray-500 mt-1">Saisissez votre adresse email exacte.</p>
+            <label className="block text-sm mb-1">{t('label_email')}</label>
+            <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('placeholder_email')} />
+            <p className="text-xs text-gray-500 mt-1">{t('help_card_number')}</p>
             {!emailValid && email.length > 0 && (
-              <p className="text-xs text-red-600 mt-1">Adresse email invalide.</p>
+              <p className="text-xs text-red-600 mt-1">{t('error_email_invalid')}</p>
             )}
           </div>
           <div>
-            <label className="block text-sm mb-1">Numéro de carte</label>
+            <label className="block text-sm mb-1">{t('label_card_number')}</label>
             <Input required value={number} onChange={(e) => setNumber(e.target.value)} placeholder="4242 4242 4242 4242" />
-            <p className="text-xs text-gray-500 mt-1">Entrez le numéro de votre carte tel qu’affiché.</p>
+            <p className="text-xs text-gray-500 mt-1">{t('help_card_number')}</p>
             {!numberValid && number.length > 0 && (
-              <p className="text-xs text-red-600 mt-1">Numéro de carte invalide.</p>
+              <p className="text-xs text-red-600 mt-1">{t('error_card_number')}</p>
             )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm mb-1">Expiration</label>
+              <label className="block text-sm mb-1">{t('label_card_expiry')}</label>
               <Input required value={expiry} onChange={(e) => setExpiry(e.target.value)} placeholder="MM/AA" />
-              <p className="text-xs text-gray-600 mt-1">Format d’expiration: mois/année (ex. 08/27).</p>
+              <p className="text-xs text-gray-600 mt-1">{t('help_card_expiry')}</p>
               {!expiryValid && expiry.length > 0 && (
-                <p className="text-xs text-red-600 mt-1">Format MM/AA requis.</p>
+                <p className="text-xs text-red-600 mt-1">{t('error_card_expiry')}</p>
               )}
             </div>
             <div>
-              <label className="block text-sm mb-1">CVC</label>
+              <label className="block text-sm mb-1">{t('label_card_cvc')}</label>
               <Input required value={cvc} onChange={(e) => setCvc(e.target.value)} placeholder="123" />
-              <p className="text-xs text-gray-600 mt-1">Code à 3 chiffres au dos de la carte.</p>
+              <p className="text-xs text-gray-600 mt-1">{t('help_card_cvc')}</p>
               {!cvcValid && cvc.length > 0 && (
-                <p className="text-xs text-red-600 mt-1">CVC invalide.</p>
+                <p className="text-xs text-red-600 mt-1">{t('error_card_cvc')}</p>
               )}
             </div>
           </div>
           <div>
-            <label className="block text-sm mb-1">Montant</label>
+            <label className="block text-sm mb-1">{t('label_amount_xaf')}</label>
             <Input type="number" required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="10000" />
-            <p className="text-xs text-gray-600 mt-1">Saisissez le montant en XAF que vous souhaitez payer.</p>
+            <p className="text-xs text-gray-600 mt-1">{t('help_amount_enter')}</p>
             {!amountValid && amount.length > 0 && (
-              <p className="text-xs text-red-600 mt-1">Le montant doit être supérieur à 0.</p>
+              <p className="text-xs text-red-600 mt-1">{t('error_phone_invalid')}</p>
             )}
           </div>
           <Button type="submit" className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50" disabled={!canSubmit}>
-            {processing ? 'Traitement...' : 'Payer'}
+            {processing ? t('common_processing') : t('common_pay')}
           </Button>
         </form>
 
         {confirmOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white w-full max-w-md rounded shadow-lg p-4">
-              <div className="text-lg font-semibold mb-2">Confirmer le paiement</div>
+              <div className="text-lg font-semibold mb-2">{t('confirm_title')}</div>
               <div className="text-sm text-gray-700 mb-4">
-                <div><span className="text-gray-500">Méthode&nbsp;:</span> Carte bancaire</div>
-                <div><span className="text-gray-500">Email&nbsp;:</span> {email}</div>
-                <div><span className="text-gray-500">Montant&nbsp;:</span> {amount} XAF</div>
-                <div className="mt-2 text-xs text-gray-700">En cliquant sur « Confirmer », vous serez redirigé vers la page sécurisée du prestataire pour valider le paiement avec votre banque.</div>
+                <div><span className="text-gray-500">{t('method_label')}&nbsp;</span> {t('pay_card')}</div>
+                <div><span className="text-gray-500">{t('email_label')}&nbsp;</span> {email}</div>
+                <div><span className="text-gray-500">{t('amount_label')}&nbsp;</span> {amount} XAF</div>
+                <div className="mt-2 text-xs text-gray-700">{t('confirm_explainer_card')}</div>
               </div>
               <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setConfirmOpen(false)}>Annuler</Button>
-                <Button onClick={confirmPayment} disabled={processing}>{processing ? 'Redirection...' : 'Confirmer'}</Button>
+                <Button variant="outline" onClick={() => setConfirmOpen(false)}>{t('btn_cancel')}</Button>
+                <Button onClick={confirmPayment} disabled={processing}>{processing ? t('common_processing') : t('btn_confirm')}</Button>
               </div>
             </div>
           </div>
