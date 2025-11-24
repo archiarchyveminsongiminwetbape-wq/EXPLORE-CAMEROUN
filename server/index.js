@@ -172,6 +172,47 @@ app.get('/api/payment/lygos', (req, res) => {
   }
 });
 
+// Nouvelle route pour l'initialisation du paiement Lygos
+app.post('/api/pay/lygos/init', async (req, res) => {
+  try {
+    const { phone, amount, currency = 'XAF' } = req.body;
+    
+    if (!phone || !amount) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: 'Phone and amount are required' 
+      });
+    }
+
+    // Créer une référence unique pour la transaction
+    const tx_ref = `LYGOS_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    
+    // Vous pouvez enregistrer la transaction dans la base de données ici si nécessaire
+    await insertTransactionInit({
+      tx_ref,
+      amount: Number(amount),
+      currency,
+      phone,
+      source: 'lygos_mtn'
+    });
+
+    // Retourner le lien de paiement Lygos
+    res.json({
+      ok: true,
+      link: 'https://pay.lygosapp.com/link/ae004d7c-a01d-439a-bddd-3551e672adf4',
+      tx_ref,
+      message: 'Paiement initialisé avec succès'
+    });
+  } catch (error) {
+    console.error('Erreur lors de l\'initialisation du paiement Lygos:', error);
+    res.status(500).json({
+      ok: false,
+      error: 'Erreur lors de l\'initialisation du paiement',
+      details: error.message
+    });
+  }
+});
+
 // Mock payment endpoints
 app.post('/api/pay/mtn', (req, res) => {
   const { phone, amount } = req.body || {};
