@@ -146,6 +146,32 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Route pour obtenir le lien de paiement Lygos
+app.get('/api/payment/lygos', (req, res) => {
+  try {
+    // URL de paiement Lygos fournie
+    const paymentUrl = 'https://pay.lygosapp.com/link/ae004d7c-a01d-439a-bddd-3551e672adf4';
+    
+    // Vous pouvez ajouter ici une logique supplémentaire si nécessaire, comme :
+    // - Vérification d'authentification
+    // - Enregistrement de la transaction dans la base de données
+    // - Personnalisation du lien en fonction des paramètres de la requête
+    
+    res.json({ 
+      success: true, 
+      paymentUrl: paymentUrl,
+      message: 'Lien de paiement généré avec succès'
+    });
+  } catch (error) {
+    console.error('Erreur lors de la génération du lien de paiement:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Erreur lors de la génération du lien de paiement',
+      details: error.message 
+    });
+  }
+});
+
 // Mock payment endpoints
 app.post('/api/pay/mtn', (req, res) => {
   const { phone, amount } = req.body || {};
