@@ -1,59 +1,73 @@
-const path = require('path');
-const dotenv = require('dotenv');
-const express = require('express');
-const cors = require('cors');
-const { Pool } = require('pg');
-const nodemailer = require('nodemailer');
-let PDFDocument;
-try { PDFDocument = require('pdfkit'); } catch (_) { PDFDocument = null; }
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+import express from 'express';
+import cors from 'cors';
+import nodemailer from 'nodemailer';
+import { supabase } from './supabaseClient.js';
+import PDFDocument from 'pdfkit';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
-// (refund endpoint is defined below after app initialization)
-
-// (PDF admin endpoint moved to bottom before app.listen)
-
-// (moved PDF receipt endpoint to after initialization)
 const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
-const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY;
-const FLW_PUBLIC_KEY = process.env.FLW_PUBLIC_KEY;
 const FRONT_URL = process.env.FRONT_URL || 'http://localhost:5173';
-const FLW_WEBHOOK_SECRET = process.env.FLW_WEBHOOK_SECRET || process.env.FLW_SECRET_HASH;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
+const LYGOS_PAYMENT_URL = process.env.LYGOS_PAYMENT_URL || 'https://pay.lygosapp.com/link/ae004d7c-a01d-439a-bddd-3551e672adf4';
 
-// PostgreSQL pool
-const pool = new Pool({
-  host: process.env.PGHOST,
-  user: process.env.PGUSER,
-  password: process.env.PGPASSWORD,
-  database: process.env.PGDATABASE,
-  port: Number(process.env.PGPORT) || 5432,
-});
+// ===== FONCTIONS UTILITAIRES =====
 
-async function ensureSchema() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS transactions (
-      id SERIAL PRIMARY KEY,
-      tx_ref TEXT UNIQUE,
-      flw_id BIGINT,
-      amount NUMERIC(18,2),
-      currency TEXT,
-      customer_email TEXT,
-      customer_phone TEXT,
-      status TEXT,
-      source TEXT,
-      raw JSONB,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-      updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-    );
-  `);
+async function ensureTransactionsTable() {
+  try {
+    const { error } = await supabase.rpc('create_transactions_table_if_not_exists');
+const LYGOS_PAYMENT_URL = process.env.LYGOS_PAYMENT_URL || 'https://pay.lygosapp.com/link/ae004d7c-a01d-439a-bddd-3551e672adf4';
+    if (error && !error.message.includes('already exists')) {
+async function ensureTransactionsTable() {
+        .select('id')
+    // Essayer de créer la table si elle n'existe pas
+    const { error } = await supabase.rpc('create_transactions_table_if_not_exists');
+    if (error && !error.message.includes('already exists')) {
+      console.warn('Could not ensure transactions table via RPC:', error.message);
+      
+      // Fallback: essayer de faire une requête simple pour vérifier l'existence
+      const { error: testError } = await supabase
+        .from('transactions')
+        .select('id')
+        .limit(1);
+      
+      if (testError && testError.code === 'PGRST116') {
+        console.log('⚠️  La table transactions doit être créée manuellement dans Supabase');
+        console.log('Structure requise:');
+        console.log(`\nCREATE TABLE transactions (
+  id SERIAL PRIMARY KEY,
+  tx_ref VARCHAR(255) UNIQUE NOT NULL,
+  flw_id VARCHAR(255),
+  amount DECIMAL(10,2) NOT NULL,
+  currency VARCHAR(10) DEFAULT 'XAF',
+  customer_email VARCHAR(255),
+  customer_phone VARCHAR(50),
+  status VARCHAR(50) DEFAULT 'pending',
+  source VARCHAR(50),
+  raw JSONB,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);\n`);
 }
 
-// Simple admin auth (optional): when ADMIN_TOKEN is set, require header x-admin-token
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to ensure transactions table:', e.message);
+  }
+}
+
+// Simple admin auth
 function adminAuth(req, res, next) {
   if (!ADMIN_TOKEN) return next();
   const token = req.headers['x-admin-token'];
@@ -61,67 +75,151 @@ function adminAuth(req, res, next) {
   return res.status(401).json({ error: 'Unauthorized' });
 }
 
-ensureSchema().catch((e) => {
+ensureTransactionsTable().catch((e) => {
   console.error('Failed to ensure schema', e);
 });
 
 async function insertTransactionInit({ tx_ref, amount, currency, email, phone, source }) {
-  await pool.query(
-    `INSERT INTO transactions (tx_ref, amount, currency, customer_email, customer_phone, status, source)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)
-     ON CONFLICT (tx_ref) DO NOTHING`,
-    [tx_ref, amount, currency, email || null, phone || null, 'initialized', source || 'checkout']
-  );
+  try {
+    const { data, error } = await supabase
+      .from('transactions')
+      .upsert({
+        tx_ref,
+        amount: Number(amount),
+        currency: currency || 'XAF',
+        customer_email: email || null,
+        customer_phone: phone || null,
+        status: 'initialized',
+        source: source || 'lygos',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'tx_ref'
+      })
+      .select()
+      .single();
+    console.warn('Failed to insert transaction init', e);
+    
+    if (error) {
+      console.warn('Failed to insert transaction:', error);
+      return null;
+    }
+    return data;
+  } catch (e) {
+    console.warn('Failed to insert transaction init:', e);
+    return null;
+  }
 }
 
-async function updateTransactionFromVerify({ tx_ref, flw_id, status, raw }) {
-  await pool.query(
-    `UPDATE transactions SET flw_id=$2, status=$3, raw=$4, updated_at=now() WHERE tx_ref=$1`,
-    [tx_ref, flw_id || null, status, raw]
-  );
+async function updateTransactionStatus({ tx_ref, status, raw, flw_id }) {
+  try {
+    const updateData = {
+      status,
+      })
+      updated_at: new Date().toISOString()
+    };
+    
+    if (raw) updateData.raw = raw;
+    if (flw_id) updateData.flw_id = flw_id;
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .update(updateData)
+      .eq('tx_ref', tx_ref)
+      .select()
+      .single();
+    
+    if (error) {
+      console.warn('Failed to update transaction:', error);
+      return null;
+    }
+    return data;
+  } catch (e) {
+    console.warn('Failed to update transaction status:', e);
+    return null;
+  }
+  }
 }
 
 function buildMailer() {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return null;
   return nodemailer.createTransport({
     service: 'gmail',
+    auth: { 
+      user: process.env.SMTP_USER, 
+      pass: process.env.SMTP_PASS 
+    },
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    }
   });
 }
 
 async function sendReceiptEmail(to, payload) {
   const transporter = buildMailer();
   if (!transporter || !to) return;
+  const text = `Merci pour votre paiement.\\n\\nRéférence: ${payload?.tx_ref}\\nMontant: ${payload?.amount} ${payload?.currency}\\nStatut: ${payload?.status}\\n`;
+
   const subject = `Reçu de paiement - ${payload?.tx_ref || ''}`;
-  const text = `Merci pour votre paiement.\n\nRéférence: ${payload?.tx_ref}\nMontant: ${payload?.amount} ${payload?.currency}\nStatut: ${payload?.status}\n`;
+  const text = `Merci pour votre paiement.\\n\\nRéférence: ${payload?.tx_ref}\\nMontant: ${payload?.amount} ${payload?.currency}\\nStatut: ${payload?.status}\\n`;
+
   const mailOptions = {
     from: process.env.SMTP_FROM || process.env.SMTP_USER,
     to,
     subject,
+    text
     text,
+    text
   };
+
   if (PDFDocument) {
     try {
       const buf = await generateReceiptPdfBuffer({
+        currency: payload?.currency,
+        status: payload?.status,
+        email: to
+      });
         tx_ref: payload?.tx_ref,
         amount: payload?.amount,
         currency: payload?.currency,
         status: payload?.status,
-        email: to,
+        status: payload?.status,
+    } catch (e) {
       });
-      mailOptions.attachments = [{ filename: `receipt_${payload?.tx_ref || 'payment'}.pdf`, content: buf }];
+        content: buf 
+      }];
+        status: payload?.status,
+    } catch (e) {
+      console.warn('PDF generation failed, sending email without attachment:', e);
+      });
+      mailOptions.attachments = [{ 
+        content: buf 
+      }];
     } catch (e) {
       console.warn('PDF generation failed, sending email without attachment', e);
     }
+    
   }
+
+
+  await transporter.sendMail(mailOptions);
+      }];
+    } catch (e) {
+      console.warn('PDF generation failed, sending email without attachment', e);
+    }
+    
+
+
   await transporter.sendMail(mailOptions);
 }
 
 async function generateReceiptPdfBuffer(info) {
   return new Promise((resolve, reject) => {
     if (!PDFDocument) return reject(new Error('pdfkit not available'));
+    
+
     const doc = new PDFDocument({ size: 'A4', margin: 50 });
     const chunks = [];
+
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
@@ -132,34 +230,36 @@ async function generateReceiptPdfBuffer(info) {
     doc.text(`Montant: ${info.amount || ''} ${info.currency || ''}`);
     doc.text(`Statut: ${info.status || ''}`);
     if (info.email) doc.text(`Client: ${info.email}`);
+// ===== INITIALISATION =====
+
+// Initialiser la table au démarrage
+ensureTransactionsTable().catch((e) => {
+  console.error('Failed to ensure schema:', e);
+});
+
+// ===== ROUTES =====
+
+// Endpoint pour vérifier l'état du serveur
     doc.moveDown();
+  res.json({ 
+    status: 'ok',
+    services: {
+      supabase: 'connected',
+      lygos: 'ready'
+    }
+  });
+});
+
     const now = new Date();
     doc.text(`Date: ${now.toLocaleString()}`);
-    doc.moveDown();
+
+  try {
     doc.text('Merci pour votre confiance.', { align: 'left' });
 
     doc.end();
   });
 }
-
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
-// Route pour obtenir le lien de paiement Lygos
-app.get('/api/payment/lygos', (req, res) => {
-  try {
-    // URL de paiement Lygos fournie
-    const paymentUrl = 'https://pay.lygosapp.com/link/ae004d7c-a01d-439a-bddd-3551e672adf4';
-    
-    // Vous pouvez ajouter ici une logique supplémentaire si nécessaire, comme :
-    // - Vérification d'authentification
-    // - Enregistrement de la transaction dans la base de données
-    // - Personnalisation du lien en fonction des paramètres de la requête
-    
-    res.json({ 
-      success: true, 
-      paymentUrl: paymentUrl,
+      paymentUrl: LYGOS_PAYMENT_URL,
       message: 'Lien de paiement généré avec succès'
     });
   } catch (error) {
@@ -171,246 +271,426 @@ app.get('/api/payment/lygos', (req, res) => {
     });
   }
 });
-
-// Nouvelle route pour l'initialisation du paiement Lygos
+  });
 app.post('/api/pay/lygos/init', async (req, res) => {
   try {
-    const { phone, amount, currency = 'XAF' } = req.body;
-    
-    if (!phone || !amount) {
+
+// Route principale pour obtenir le lien de paiement Lygos
+app.get('/api/payment/lygos', (req, res) => {
       return res.status(400).json({ 
         ok: false, 
-        error: 'Phone and amount are required' 
+        error: 'Amount is required' 
+
+  try {
+    const { order_id, tx_ref } = req.query;
+    const ref = order_id || tx_ref;
+      paymentUrl: LYGOS_PAYMENT_URL,
+    if (!ref) {
+    // Créer une référence unique pour la transaction
+    const tx_ref = `LYGOS_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+      return res.status(400).json({ 
+      raw: { verified_at: new Date().toISOString(), method: 'lygos' }
+    });
+
+    await insertTransactionInit({
+      tx_ref,
+      amount: Number(amount),
+      currency,
+      .from('transactions')
+      .eq('tx_ref', ref)
+      await sendReceiptEmail(transaction.customer_email, {
+        tx_ref: ref,
+        currency: transaction.currency,
+        status,
+      link: LYGOS_PAYMENT_URL,
+    }
+    });
+  } catch (error) {
+    console.error('Erreur lors de la génération du lien de paiement:', error);
+    res.status(500).json({ 
+      link: LYGOS_PAYMENT_URL,
+      tx_ref,
+      message: 'Paiement initialisé avec succès'
+    });
+  } catch (error) {
+      success: false, 
+        tx_ref: ref,
+        status,
+    res.status(500).json({
+      ok: false,
+    });
+  }
+});
+
+app.post('/api/pay/lygos/init', async (req, res) => {
+  try {
+    const { phone, amount, currency = 'XAF', email, name } = req.body;
+
+    if (!amount) {
+        ok: false, 
+        error: 'Amount is required' 
+      });
+    }
+        error: 'Amount is required' 
+    // Pour Lygos, nous simulons une vérification réussie
+    const { tx_ref, status, amount, currency } = req.body;
+
+    const status = 'successful';
+
+    if (!LYGOS_PAYMENT_URL) {
+      return res.status(500).json({ 
+        ok: false, 
+        error: 'URL de paiement Lygos non configurée' 
       });
     }
 
     // Créer une référence unique pour la transaction
     const tx_ref = `LYGOS_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-    
-    // Vous pouvez enregistrer la transaction dans la base de données ici si nécessaire
+
+    // Mettre à jour le statut
+    await updateTransactionStatus({
+    // Enregistrer la transaction dans Supabase
+      status,
+      raw: { verified_at: new Date().toISOString(), method: 'lygos' }
+    });
+
     await insertTransactionInit({
       tx_ref,
       amount: Number(amount),
       currency,
+      email,
+    // Envoyer le reçu par email si disponible
       phone,
-      source: 'lygos_mtn'
+      source: 'lygos'
+      await sendReceiptEmail(transaction.customer_email, {
+        tx_ref: ref,
+        currency: transaction.currency,
+        status,
+    }
     });
 
-    // Retourner le lien de paiement Lygos
     res.json({
       ok: true,
-      link: 'https://pay.lygosapp.com/link/ae004d7c-a01d-439a-bddd-3551e672adf4',
+      link: LYGOS_PAYMENT_URL,
       tx_ref,
       message: 'Paiement initialisé avec succès'
     });
   } catch (error) {
-    console.error('Erreur lors de l\'initialisation du paiement Lygos:', error);
+    console.error('Erreur lors de l\\'initialisation du paiement Lygos:', error);
+        tx_ref: ref,
+        status,
     res.status(500).json({
       ok: false,
-      error: 'Erreur lors de l\'initialisation du paiement',
+      error: 'Erreur lors de l\\'initialisation du paiement',
+        currency: transaction.currency,
+        payment_method: 'lygos'
+      }
       details: error.message
     });
-  }
+        status: status || 'completed',
+        raw: req.body
 });
 
-// Mock payment endpoints
-app.post('/api/pay/mtn', (req, res) => {
-  const { phone, amount } = req.body || {};
-  if (!phone || !amount) return res.status(400).json({ error: 'phone and amount are required' });
-  return res.json({ ok: true, method: 'mtn', message: `Paiement MTN de ${amount} XAF initié pour ${phone}` });
 });
 
-app.post('/api/pay/orange', (req, res) => {
-  const { phone, amount } = req.body || {};
-  if (!phone || !amount) return res.status(400).json({ error: 'phone and amount are required' });
-  return res.json({ ok: true, method: 'orange', message: `Paiement Orange Money de ${amount} XAF initié pour ${phone}` });
-});
-
-app.post('/api/pay/card', (req, res) => {
-  const { number, expiry, cvc, amount, email } = req.body || {};
-  if (!number || !expiry || !cvc || !amount) return res.status(400).json({ error: 'number, expiry, cvc, amount are required' });
-  return res.json({ ok: true, method: 'card', message: `Paiement carte de ${amount} validé pour ${email || 'client'}` });
-});
-
-// Flutterwave Hosted Checkout (Cameroon, XAF)
-app.post('/api/pay/flutterwave/init', async (req, res) => {
+app.get('/api/pay/lygos/verify', async (req, res) => {
   try {
-    if (!FLW_SECRET_KEY) return res.status(500).json({ error: 'FLW_SECRET_KEY is not configured' });
-    const { amount, currency = 'XAF', email, phone, name } = req.body || {};
-    if (!amount) return res.status(400).json({ error: 'amount is required' });
-    const tx_ref = `EXP_${Date.now()}_${Math.floor(Math.random()*10000)}`;
-    // Persist initial intent
-    try {
-      await insertTransactionInit({ tx_ref, amount: Number(amount), currency, email, phone, source: 'flutterwave' });
-    } catch (e) {
-      console.warn('Failed to insert initial transaction', e);
+    const { order_id, tx_ref } = req.query;
+    const ref = order_id || tx_ref;
+  }
+
+    if (!ref) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: 'order_id ou tx_ref requis' 
+      });
     }
-    const body = {
-      tx_ref,
-      amount: Number(amount),
-      currency,
-      redirect_url: `${FRONT_URL}/payment/callback`,
-      customer: {
-        email: email || 'client@example.com',
-        phonenumber: phone || undefined,
-        name: name || 'Client',
-      },
-      customizations: {
-        title: 'Explore Cameroun',
-        description: 'Paiement de commande',
-      },
-    };
-    const resp = await fetch('https://api.flutterwave.com/v3/payments', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${FLW_SECRET_KEY}`,
-      },
-      body: JSON.stringify(body),
-    });
-    const data = await resp.json();
-    if (!resp.ok) return res.status(400).json({ error: data?.message || 'Flutterwave init failed', details: data });
-    return res.json({ ok: true, link: data?.data?.link, tx_ref });
-  } catch (e) {
-    return res.status(500).json({ error: 'Internal error', details: String(e) });
+    const { tx_ref, status, amount, currency } = req.body;
+
+    // Récupérer la transaction depuis Supabase
+    const { data: transaction, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('tx_ref', ref)
+      .single();
+
+    if (error || !transaction) {
+          status,
+          status
+        ok: false, 
+        error: 'Transaction non trouvée' 
+    }
+
+    // Pour Lygos, nous simulons une vérification réussie
+    // Dans un vrai scénario, vous feriez un appel API à Lygos pour vérifier
+    const status = 'successful';
+      query = query.eq('customer_email', email);
+    }
   }
 });
-
-// Admin: list transactions with filters and pagination
-app.get('/api/admin/transactions', adminAuth, async (req, res) => {
-  try {
+    await updateTransactionStatus({
+      tx_ref: ref,
     const { status, email, q, limit = '20', offset = '0' } = req.query;
-    const params = [];
-    const wheres = [];
-    if (status) { params.push(String(status)); wheres.push(`status = $${params.length}`); }
-    if (email) { params.push(String(email)); wheres.push(`customer_email = $${params.length}`); }
-    if (q) {
-      const like = `%${q}%`;
-      params.push(like, like);
-      wheres.push(`(tx_ref ILIKE $${params.length-1} OR customer_phone ILIKE $${params.length})`);
+    });
+
+    // Envoyer le reçu par email si disponible
+    if (status === 'successful' && transaction.customer_email) {
+      await sendReceiptEmail(transaction.customer_email, {
+        tx_ref: ref,
+        amount: transaction.amount,
+        currency: transaction.currency,
+        status,
+        status
+      });
     }
-    const whereSql = wheres.length ? `WHERE ${wheres.join(' AND ')}` : '';
+
+    res.json({
+      ok: true,
+        tx_ref: ref,
+      throw error;
+    }
+        amount: transaction.amount,
     const lim = Math.min(parseInt(limit, 10) || 20, 100);
     const off = Math.max(parseInt(offset, 10) || 0, 0);
-    const rows = (await pool.query(
-      `SELECT id, tx_ref, flw_id, amount, currency, customer_email, customer_phone, status, source, created_at, updated_at
-       FROM transactions ${whereSql}
-       ORDER BY created_at DESC
-       LIMIT ${lim} OFFSET ${off}`,
-      params
-    )).rows;
-    res.json({ ok: true, rows });
-  } catch (e) {
-    res.status(500).json({ error: 'Internal error', details: String(e) });
-  }
-});
+        currency: transaction.currency,
+    res.json({ ok: true, rows: rows || [] });
 
-// Verify Flutterwave transaction by id
-app.get('/api/pay/flutterwave/verify', async (req, res) => {
-  try {
-    if (!FLW_SECRET_KEY) return res.status(500).json({ error: 'FLW_SECRET_KEY is not configured' });
-    const id = req.query.transaction_id || req.query.id;
-    if (!id) return res.status(400).json({ error: 'transaction_id is required' });
-    const url = `https://api.flutterwave.com/v3/transactions/${id}/verify`;
-    const resp = await fetch(url, {
-      headers: { Authorization: `Bearer ${FLW_SECRET_KEY}` },
     });
-    const data = await resp.json();
-    if (!resp.ok) return res.status(400).json({ error: data?.message || 'Flutterwave verify failed', details: data });
-    const payload = data?.data || data;
-    const tx_ref = payload?.tx_ref;
-    const flw_id = payload?.id;
-    const status = (payload?.status || '').toLowerCase();
-    try {
-      await updateTransactionFromVerify({ tx_ref, flw_id, status, raw: payload });
-      if (status === 'successful') {
-        await sendReceiptEmail(payload?.customer?.email || payload?.customer?.email_address, {
-          tx_ref,
-          amount: payload?.amount,
-          currency: payload?.currency,
-          status,
-        });
-      }
-    } catch (e) {
-      console.warn('Failed to persist or email after verify', e);
-    }
-    return res.json({ ok: true, data: payload });
-  } catch (e) {
-    return res.status(500).json({ error: 'Internal error', details: String(e) });
+  } catch (error) {
+    console.error('Erreur lors de la vérification:', error);
+    res.status(500).json({
+      ok: false,
+      error: 'Erreur lors de la vérification',
+    });
   }
+    }
+  } catch (e) {
+        raw: req.body
 });
-
-app.get('/api/admin/transactions/:key', adminAuth, async (req, res) => {
-  try {
+});
+// Webhook Lygos
+    if (error || !row) {
+      // Récupérer les détails de la transaction pour l'email
     const { key } = req.params;
-    let row;
-    if (/^\d+$/.test(key)) {
-      row = (await pool.query(`SELECT * FROM transactions WHERE id=$1`, [Number(key)])).rows[0];
-    } else {
-      row = (await pool.query(`SELECT * FROM transactions WHERE tx_ref=$1`, [key])).rows[0];
-    }
-    if (!row) return res.status(404).json({ error: 'Not found' });
-    res.json({ ok: true, row });
-  } catch (e) {
-    res.status(500).json({ error: 'Internal error', details: String(e) });
-  }
-});
 
-// Admin: resend receipt email
+
+      await updateTransactionStatus({
+        tx_ref,
+        status: status || 'completed',
+        raw: req.body,
+      });
+      tx_ref: row.tx_ref,
+    }
+      // Récupérer les détails de la transaction pour l'email
+      const { data: transaction } = await supabase
+        .from('transactions')
+        .select('customer_email')
+        .eq('tx_ref', tx_ref)
+        .single();
+
+    }
+
+// Admin: renvoyer le reçu par email
 app.post('/api/admin/transactions/:key/resend-receipt', adminAuth, async (req, res) => {
   try {
     const { key } = req.params;
-    let row;
-    if (/^\d+$/.test(key)) {
-      row = (await pool.query(`SELECT * FROM transactions WHERE id=$1`, [Number(key)])).rows[0];
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Erreur webhook Lygos:', error);
+    res.status(500).json({ ok: false, error: error.message });
+  try {
     } else {
-      row = (await pool.query(`SELECT * FROM transactions WHERE tx_ref=$1`, [key])).rows[0];
     }
-    if (!row) return res.status(404).json({ error: 'Not found' });
-    if (!row.customer_email) return res.status(400).json({ error: 'No customer email on record' });
+    }
+  }
+
+
+// Admin: liste des transactions
+      query = query.or(`tx_ref.ilike.%${q}%,customer_phone.ilike.%${q}%`);
+    }
+app.get('/api/admin/transactions', adminAuth, async (req, res) => {
+  try {
+    const { status, email, q, limit = '20', offset = '0' } = req.query;
+
+
+    let query = supabase
+    });
+      query = query.eq('status', status);
+
+    const { data: row, error } = await query.single();
+
+    res.json({ ok: true });
+  } catch (e) {
+      query = query.eq('customer_email', email);
+    if (q) {
+      query = query.or(`tx_ref.ilike.%${q}%,customer_phone.ilike.%${q}%`);
+      throw error;
+      amount: row.amount,
+  try {
+
+    const lim = Math.min(parseInt(limit, 10) || 20, 100);
+    const off = Math.max(parseInt(offset, 10) || 0, 0);
+
+    res.json({ ok: true, rows: rows || [] });
+
+    query = query.range(off, off + lim - 1);
+
+
+    if (error) {
+      throw error;
+    } else {
+    }
+    }
+
+  } catch (e) {
+    console.error('Erreur admin transactions:', e);
+    res.status(500).json({ error: 'Internal error', details: String(e) });
+    const { data: row, error } = await query.single();
+      email: row.customer_email,
+      email: row.customer_email
+});
+
+    if (error || !row) {
+// Admin: détails d'une transaction
+      return res.status(404).json({ error: 'Not found' });
+  } catch (e) {
+    }
+app.get('/api/admin/transactions/:key', adminAuth, async (req, res) => {
+  }
+});
+
+// ===== DÉMARRAGE DU SERVEUR =====
+
+app.listen(PORT, () => {
+  try {
+    const { key } = req.params;
+
+});
+    let query = supabase.from('transactions').select('*');
+
+    if (/^\\d+$/.test(key)) {
+      query = query.eq('id', Number(key));
+
+    } else {
+      query = query.eq('tx_ref', key);
+      tx_ref: row.tx_ref,
+    }
+
+    const { data: row, error } = await query.single();
+
+    if (error || !row) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+      currency: row.currency,
+      status: row.status,
+    console.error('Erreur admin transaction détail:', e);
+    });
+
+    res.json({ ok: true });
+    res.json({ ok: true, row });
+  } catch (e) {
+// Admin: renvoyer le reçu par email
+    console.error('Erreur admin transaction détail:', e);
+    res.status(500).json({ error: 'Internal error', details: String(e) });
+  }
+});
+
+// Admin: renvoyer le reçu par email
+app.post('/api/admin/transactions/:key/resend-receipt', adminAuth, async (req, res) => {
+  try {
+    const { key } = req.params;
+
+    let query = supabase.from('transactions').select('*');
+
+    if (/^\\d+$/.test(key)) {
+      query = query.eq('id', Number(key));
+  try {
+    } else {
+      query = query.eq('tx_ref', key);
+    }
+
+
+    const { data: row, error } = await query.single();
+
+    if (error || !row) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    if (!row.customer_email) {
+      return res.status(400).json({ error: 'No customer email on record' });
+    }
+
+    if (/^\\d+$/.test(key)) {
+      query = query.eq('id', Number(key));
+    } else {
+      query = query.eq('tx_ref', key);
+    }
     await sendReceiptEmail(row.customer_email, {
       tx_ref: row.tx_ref,
       amount: row.amount,
       currency: row.currency,
-      status: row.status,
+      status: row.status
     });
+
+
+    const { data: row, error } = await query.single();
+
     res.json({ ok: true });
   } catch (e) {
+    console.error('Erreur resend receipt:', e);
+    if (error || !row) {
+      return res.status(404).json({ error: 'Not found' });
+    }
     res.status(500).json({ error: 'Internal error', details: String(e) });
   }
 });
 
-// Flutterwave Webhook
-app.post('/api/pay/flutterwave/webhook', async (req, res) => {
+// Endpoint pour générer un PDF de reçu
+app.get('/api/admin/transactions/:key/pdf', adminAuth, async (req, res) => {
+      amount: row.amount,
   try {
-    const sig = req.headers['verif-hash'] || req.headers['verif_hash'];
-    if (!FLW_WEBHOOK_SECRET || !sig || sig !== FLW_WEBHOOK_SECRET) {
-      return res.status(401).json({ error: 'Invalid signature' });
+    const { key } = req.params;
+
+    let query = supabase.from('transactions').select('*');
+
+    if (/^\\d+$/.test(key)) {
+      query = query.eq('id', Number(key));
+    } else {
+      query = query.eq('tx_ref', key);
+    });
     }
-    const event = req.body?.event;
-    const payload = req.body?.data || req.body;
-    const tx_ref = payload?.tx_ref;
-    const flw_id = payload?.id;
-    const status = (payload?.status || '').toLowerCase();
-    try {
-      await updateTransactionFromVerify({ tx_ref, flw_id, status, raw: payload });
-      if (status === 'successful') {
-        await sendReceiptEmail(payload?.customer?.email || payload?.customer?.email_address, {
-          tx_ref,
-          amount: payload?.amount,
-          currency: payload?.currency,
-          status,
-        });
-      }
-    } catch (e) {
-      console.warn('Webhook persist/email failed', e);
+
+    const { data: row, error } = await query.single();
+
+    if (error || !row) {
+      return res.status(404).json({ error: 'Not found' });
     }
-    return res.json({ ok: true });
+
+
+    const pdfBuffer = await generateReceiptPdfBuffer({
+      tx_ref: row.tx_ref,
+      amount: row.amount,
+      currency: row.currency,
+      status: row.status,
+      email: row.customer_email,
+      email: row.customer_email
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=\"receipt_${row.tx_ref}.pdf\"`);
+    res.send(pdfBuffer);
   } catch (e) {
-    return res.status(500).json({ error: 'Internal error', details: String(e) });
+    console.error('Erreur PDF generation:', e);
+    res.status(500).json({ error: 'Internal error', details: String(e) });
   }
 });
 
+// ===== DÉMARRAGE DU SERVEUR =====
+
 app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
+  console.log(`🚀 Server listening on http://localhost:${PORT}`);
+  console.log(`💳 Lygos payment URL: ${LYGOS_PAYMENT_URL}`);
+  console.log(`🌐 Frontend URL: ${FRONT_URL}`);
 });

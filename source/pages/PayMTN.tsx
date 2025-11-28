@@ -1,94 +1,124 @@
 import * as React from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Pied de page';
-import { Button } from '@/components/interface utilisateur/button';
-import { Input } from '@/components/interface utilisateur/input';
-import { useCart } from '@/crochets/utiliser-panier';
-import { useI18n } from '@/crochets/utiliser-i18n';
+import PaymentButton from '@/components/PaymentButton';
 
 export default function PayMTN() {
-  const { totalXaf } = useCart();
-  const { t } = useI18n();
-  const [phone, setPhone] = React.useState('');
-  const [amount, setAmount] = React.useState<string>(() => String(totalXaf || ''));
-  const [processing, setProcessing] = React.useState(false);
-  const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001';
-  const [confirmOpen, setConfirmOpen] = React.useState(false);
-  const phoneValid = /^\d{9}$/.test(phone.trim());
-  const amountValid = Number(amount) > 0;
-  const canSubmit = phoneValid && amountValid && !processing;
+  const [amount, setAmount] = React.useState<string>('');
+  const [phone, setPhone] = React.useState<string>('');
+  const [email, setEmail] = React.useState<string>('');
+  const [name, setName] = React.useState<string>('');
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setConfirmOpen(true);
+  const handlePaymentSuccess = (txRef: string) => {
+    console.log('Paiement initié avec succès:', txRef);
   };
 
-  const confirmPayment = async () => {
-    setProcessing(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/pay/lygos/init`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, amount: Number(amount), currency: 'XAF' }),
-      });
-      const data = await res.json();
-      if (data?.ok && data?.link) {
-        window.open(data.link, '_blank', 'noopener');
-        return;
-      }
-      alert(data?.error || 'Impossible d’initier le paiement');
-    } catch (e) {
-      alert('Erreur de paiement');
-    } finally {
-      setProcessing(false);
-      setConfirmOpen(false);
-    }
+  const handlePaymentError = (error: string) => {
+    alert(`Erreur de paiement: ${error}`);
   };
+
+  const isFormValid = amount && parseFloat(amount) > 0 && phone;
 
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
       <main className="container mx-auto px-4 py-8 flex-1">
-        <h1 className="text-2xl font-semibold mb-4">{t('pay_mtn_title')}</h1>
-        <div className="mb-6">
-          <img src="/assets/MTN.jpeg" alt="MTN Mobile Money" className="h-16 w-auto object-contain" />
-        </div>
-        <form onSubmit={onSubmit} className="space-y-4 max-w-md">
-          <div>
-            <label className="block text-sm mb-1">{t('label_phone_mtn')}</label>
-            <Input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="67x xxx xxx" />
-            <p className="text-xs text-gray-600 mt-1">{t('help_phone_mtn')}</p>
-            {!phoneValid && phone.length > 0 && (
-              <p className="text-xs text-red-600 mt-1">{t('error_phone_invalid')}</p>
-            )}
+        <div className="max-w-md mx-auto">
+          <h1 className="text-2xl font-semibold mb-6">Paiement MTN Mobile Money</h1>
+          
+          <div className="mb-6">
+            <img 
+              src="/assets/mtn.png" 
+              alt="MTN Mobile Money" 
+              className="h-16 w-auto object-contain mx-auto"
+            />
           </div>
-          <div>
-            <label className="block text-sm mb-1">{t('label_amount_xaf')}</label>
-            <Input type="number" required value={amount} readOnly />
-            <p className="text-xs text-gray-600 mt-1">{t('help_amount_cart')}</p>
-          </div>
-          <Button type="submit" className="bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50" disabled={!canSubmit}>
-            {processing ? t('common_processing') : t('common_pay')}
-          </Button>
-        </form>
 
-        {confirmOpen && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white w-full max-w-md rounded shadow-lg p-4">
-              <div className="text-lg font-semibold mb-2">{t('confirm_title')}</div>
-              <div className="text-sm text-gray-700 mb-4">
-                <div><span className="text-gray-500">{t('operator_label')}&nbsp;</span> MTN Mobile Money</div>
-                <div><span className="text-gray-500">{t('phone_label')}&nbsp;</span> {phone}</div>
-                <div><span className="text-gray-500">{t('amount_label')}&nbsp;</span> {amount} XAF</div>
-                <div className="mt-2 text-xs text-gray-700">{t('confirm_explainer_mtn')}</div>
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setConfirmOpen(false)}>{t('btn_cancel')}</Button>
-                <Button onClick={confirmPayment} disabled={processing}>{processing ? t('common_processing') : t('btn_confirm')}</Button>
-              </div>
+          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+            <div>
+              <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">
+                Montant (XAF) *
+              </label>
+              <input
+                type="number"
+                id="amount"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="Ex: 5000"
+                min="100"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
             </div>
+
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                Numéro MTN *
+              </label>
+              <input
+                type="tel"
+                id="phone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Ex: 677123456"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                Email (optionnel)
+              </label>
+              <input
+                type="email"
+                id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="votre@email.com"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                Nom complet (optionnel)
+              </label>
+              <input
+                type="text"
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Votre nom complet"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <PaymentButton
+              amount={parseFloat(amount) || 0}
+              currency="XAF"
+              phone={phone}
+              email={email || undefined}
+              name={name || undefined}
+              description="Paiement MTN Mobile Money"
+              onSuccess={handlePaymentSuccess}
+              onError={handlePaymentError}
+              className={`w-full py-3 px-4 rounded-md font-medium transition-colors ${
+                isFormValid
+                  ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              Payer avec MTN Mobile Money
+            </PaymentButton>
+          </form>
+
+          <div className="mt-6 text-sm text-gray-600">
+            <p>• Assurez-vous que votre numéro MTN est actif</p>
+            <p>• Vous recevrez une notification pour confirmer le paiement</p>
+            <p>• Un reçu vous sera envoyé par email si fourni</p>
           </div>
-        )}
+        </div>
       </main>
       <Footer />
     </div>
