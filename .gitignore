@@ -1,25 +1,49 @@
-# Dependencies
+"# Dependencies
 node_modules/
 server/node_modules/
+source/node_modules/
 
-# Build outputs
-dist/
-.vite/
-
-# Env
+# Variables d'environnement
 .env
-.env.*
 server/.env
+*.env.local
+*.env.production
+
+# Dépendances
+node_modules/
+server/node_modules/
+source/node_modules/
 
 # Logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Build
+dist/
+build/
+.next/
+.vercel/
+
+# Cache
+.cache/
+.parcel-cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
 # OS
 .DS_Store
 Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
 
 # Editor
 .vscode/
@@ -31,3 +55,4 @@ Thumbs.db
 # Misc
 coverage/
 *.local
+"

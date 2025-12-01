@@ -60,10 +60,12 @@ class PaymentService {
     // Construire l'URL avec les paramètres de callback
     const url = new URL(paymentUrl);
     
+
     if (txRef) {
       url.searchParams.set('tx_ref', txRef);
     }
     
+
     url.searchParams.set('callback_url', PAYMENT_CONFIG.CALLBACK_URL);
     url.searchParams.set('success_url', PAYMENT_CONFIG.SUCCESS_URL);
     url.searchParams.set('cancel_url', PAYMENT_CONFIG.CANCEL_URL);

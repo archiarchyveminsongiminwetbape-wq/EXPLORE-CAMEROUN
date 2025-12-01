@@ -1,3 +1,23 @@
+export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed'
+
+export interface Booking {
+  id: string
+  destination: string
+  property: string
+  guestName: string
+  guestEmail: string
+  guestPhone: string
+  checkIn: Date | string
+  checkOut: Date | string
+  guests: number
+  rooms: number
+  totalAmount: number
+  status: BookingStatus
+  specialRequests?: string
+  createdAt: Date | string
+  updatedAt?: Date | string
+}
+
 export interface Destination {
   id: string;
   name: string;

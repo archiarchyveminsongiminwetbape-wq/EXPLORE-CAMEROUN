@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/interface utilisateur/button';
 import { Card, CardContent } from '@/components/interface utilisateur/card';
-import { MapPin, Users, Shield, Plane, ArrowRight, Star, CheckCircle } from 'lucide-react';
+import { MapPin, Users, Shield, Plane, ArrowRight, Star, Globe, DollarSign } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { useCurrency } from '@/crochets/utiliser-devise';
@@ -23,7 +23,10 @@ const i18n = {
     howItWorksTips: ['Parcourez nos destinations et sélectionnez celle qui vous inspire','Ajoutez hébergement, transport, activités selon vos préférences','Finalisez votre réservation et préparez-vous à vivre l\'aventure'],
     testimonials: 'Ce que disent nos voyageurs',
     testimonialsDesc: 'Des expériences authentiques partagées par nos clients',
-    readyTitle: "Prêt pour l'aventure ?", readySubtitle: "Laissez-nous organiser le voyage de vos rêves au Cameroun. Une expérience unique vous attend !", startTrip: 'Commencer mon voyage', contactUs: 'Nous contacter',
+    readyTitle: "Prêt pour l'aventure ?", 
+    readySubtitle: "Laissez-nous organiser le voyage de vos rêves au Cameroun. Une expérience unique vous attend !", 
+    startTrip: 'Commencer mon voyage', 
+    contactUs: 'Nous contacter',
   },
   en: {
     heroTitle: 'Discover Authentic Cameroon',
@@ -40,7 +43,10 @@ const i18n = {
     howItWorksTips: ['Browse our destinations and pick one you love','Add accommodation, transport, activities as you like','Complete your booking and get ready for adventure'],
     testimonials: 'What travelers say',
     testimonialsDesc: 'Authentic experiences shared by our clients',
-    readyTitle: 'Ready for adventure?', readySubtitle: 'Let us arrange your dream Cameroon journey. Unique memories await!', startTrip: 'Start my trip', contactUs: 'Contact us',
+    readyTitle: 'Ready for adventure?', 
+    readySubtitle: 'Let us arrange your dream Cameroon journey. Unique memories await!', 
+    startTrip: 'Start my trip', 
+    contactUs: 'Contact us',
   }
 };
 
@@ -99,13 +105,39 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-white">
       <Header />
-      <div className="flex flex-row justify-end p-2 gap-3">
-        <label className="text-sm mr-2">{lang==='fr' ? 'Langue' : 'Language'}:</label>
-        <select value={lang} onChange={e => setLang(e.target.value as 'fr'|'en')} className="border rounded text-xs px-1 py-0.5">
-          <option value="fr">Français</option>
-          <option value="en">English</option>
-        </select>
-        <div className="ml-8 text-xs py-1">{lang==='fr'?'Devise':'Currency'}: <span className="font-semibold">{currency}</span></div>
+      
+      {/* Language and Currency Selector - Improved responsive design */}
+      <div className="bg-gray-50 border-b border-gray-200">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row justify-end items-center py-3 gap-4 sm:gap-6">
+            {/* Language Selector */}
+            <div className="flex items-center gap-2">
+              <Globe className="h-4 w-4 text-gray-600" />
+              <label className="text-sm font-medium text-gray-700">
+                {lang === 'fr' ? 'Langue' : 'Language'}:
+              </label>
+              <select 
+                value={lang} 
+                onChange={e => setLang(e.target.value as 'fr'|'en')} 
+                className="border border-gray-300 rounded-md text-sm px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              >
+                <option value="fr">🇫🇷 Français</option>
+                <option value="en">🇺🇸 English</option>
+              </select>
+            </div>
+
+            {/* Currency Display */}
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-gray-600" />
+              <span className="text-sm font-medium text-gray-700">
+                {lang === 'fr' ? 'Devise' : 'Currency'}:
+              </span>
+              <span className="text-sm font-semibold text-green-600 bg-green-50 px-2 py-1 rounded">
+                {currency}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
       
       {/* Hero Section */}
@@ -120,22 +152,22 @@ export default function Index() {
         </div>
         
         <div className="relative z-10 text-center text-white px-4 max-w-4xl mx-auto">
-          <h1 className="text-5xl md:text-7xl font-bold mb-6 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold mb-6 animate-in fade-in slide-in-from-bottom-8 duration-1000">
             {t.heroTitle}
-            <span className="text-green-400 block">Cameroun Authentique</span>
+            <span className="text-green-400 block mt-2">Cameroun Authentique</span>
           </h1>
-          <p className="text-xl md:text-2xl mb-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
+          <p className="text-lg sm:text-xl md:text-2xl mb-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300 max-w-3xl mx-auto">
             {t.heroSubtitle}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-500">
             <Link to="/organize-trip">
-              <Button size="lg" className="bg-green-600 hover:bg-green-700 text-lg px-8 py-4">
+              <Button size="lg" className="bg-green-600 hover:bg-green-700 text-lg px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto">
                 {t.organizeBtn}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
             <Link to="/destinations">
-              <Button size="lg" variant="outline" className="text-white border-white hover:bg-white hover:text-gray-900 text-lg px-8 py-4">
+              <Button size="lg" variant="outline" className="text-white border-white hover:bg-white hover:text-gray-900 text-lg px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto">
                 {t.seeDestBtn}
               </Button>
             </Link>
@@ -144,18 +176,18 @@ export default function Index() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-16 sm:py-20 bg-gray-50">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+          <div className="text-center mb-12 sm:mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
               {t.featuresTitle}
             </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto">
               {t.featuresDesc}
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
             {features.map((feature, index) => (
               <Card key={index} className="text-center hover:shadow-lg transition-shadow duration-300">
                 <CardContent className="p-6">
@@ -172,18 +204,18 @@ export default function Index() {
       </section>
 
       {/* Popular Destinations Preview */}
-      <section className="py-20">
+      <section className="py-16 sm:py-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+          <div className="text-center mb-12 sm:mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
               {t.destPopular}
             </h2>
-            <p className="text-xl text-gray-600">
+            <p className="text-lg sm:text-xl text-gray-600">
               {t.destPopularDesc}
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mb-12">
             <div className="relative group overflow-hidden rounded-lg">
               <img 
                 src="/assets/Mont Cameroun.jpg" 
@@ -236,13 +268,13 @@ export default function Index() {
       </section>
 
       {/* How it works */}
-      <section className="py-20 bg-green-50">
+      <section className="py-16 sm:py-20 bg-green-50">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+          <div className="text-center mb-12 sm:mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
               {t.howItWorks}
             </h2>
-            <p className="text-xl text-gray-600">
+            <p className="text-lg sm:text-xl text-gray-600">
               Organisez votre voyage en 3 étapes simples
             </p>
           </div>
@@ -276,18 +308,18 @@ export default function Index() {
       </section>
 
       {/* Testimonials */}
-      <section className="py-20">
+      <section className="py-16 sm:py-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+          <div className="text-center mb-12 sm:mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
               {t.testimonials}
             </h2>
-            <p className="text-xl text-gray-600">
+            <p className="text-lg sm:text-xl text-gray-600">
               {t.testimonialsDesc}
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
             {testimonials.map((testimonial, index) => (
               <Card key={index} className="hover:shadow-lg transition-shadow duration-300">
                 <CardContent className="p-6">
@@ -316,23 +348,23 @@ export default function Index() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-green-600">
+      <section className="py-16 sm:py-20 bg-green-600">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl font-bold text-white mb-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
             {t.readyTitle}
           </h2>
-          <p className="text-xl text-green-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-green-100 mb-8 max-w-2xl mx-auto">
             {t.readySubtitle}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/organize-trip">
-              <Button size="lg" variant="secondary" className="text-lg px-8 py-4">
+              <Button size="lg" variant="secondary" className="text-lg px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto">
                 {t.startTrip}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
             <a href="https://wa.me/237657029080" target="_blank" rel="noopener noreferrer">
-              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-green-600 text-lg px-8 py-4">
+              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-green-600 text-lg px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto">
                 {t.contactUs}
               </Button>
             </a>

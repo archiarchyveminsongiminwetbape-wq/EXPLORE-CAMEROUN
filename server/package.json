@@ -9,7 +9,11 @@
     "start": "node index.js",
     "dev": "nodemon index.js"
   },
-  "keywords": ["supabase", "node", "express"],
+  "keywords": [
+    "supabase",
+    "node",
+    "express"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -17,7 +21,8 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "nodemailer": "^7.0.10"
+    "nodemailer": "^7.0.10",
+    "pdfkit": "^0.17.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
